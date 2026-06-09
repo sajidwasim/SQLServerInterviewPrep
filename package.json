@@ -1,0 +1,20 @@
+{
+  "name": "sql-server-interview-prep",
+  "version": "1.0.0",
+  "description": "SQL Server DBA Interview Preparation Study Site — Senior Infrastructure Operations Engineer at Coop Denmark",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch",
+    "preview": "npx serve dist"
+  },
+  "keywords": ["sql-server", "dba", "interview-prep", "study-guide"],
+  "license": "MIT",
+  "dependencies": {
+    "fs-extra": "^11.2.0",
+    "glob": "^10.3.12",
+    "marked": "^12.0.2",
+    "marked-highlight": "^2.1.4",
+    "highlight.js": "^11.9.0"
+  }
+}

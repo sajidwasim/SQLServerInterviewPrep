@@ -1,0 +1,39 @@
+## Senior Infrastructure Operations Engineer
+– SQL Server & Automation 
+XYZ Denmark | Albertslund
+Do you want to work with the operation and development of business-critical SQL Server platforms at enterprise scale? 
+
+## Your role
+At XYZ, you will play a central role in a complex Infrastructure Operations environment with responsibility for highly available SQL Server solutions across multiple data centers. You will work with performance tuning, automation, high availability, disaster recovery, and modernization towards cloud-based infrastructure solutions.
+
+We are looking for an experienced SQL Server DBA/Infrastructure Specialist who is motivated by both stable operations, technical immersion and continuous optimization of critical infrastructure. You thrive in complex enterprise environments where high operational stability, collaboration and proactive development are essential.
+
+## You will be working with
+
+Operation, maintenance and further development of business-critical SQL Server platforms in a complex 24/7 enterprise environment
+Performance tuning, capacity optimization and automation of SQL Server operations with a focus on stability, efficiency and scalability
+Design, operation and continuous improvement of High Availability and Disaster Recovery solutions that support high uptime across data centers
+Infrastructure modernization and participation in cloud initiatives with a focus on the Azure platform and future-proof solutions
+Planning and executing migrations, upgrades and technical improvement projects across critical platforms
+Work with security, compliance and robust operational processes to ensure a stable and secure data platform
+Troubleshooting, incident management and technical sparring in an environment where high availability and rapid problem resolution are crucial
+
+You will be part of the Infrastructure Operations team, which consists of highly experienced and inquisitive colleagues responsible for the operation and development of XYZ's entire infrastructure. The team supports the business across Denmark, the Faroe Islands, Greenland and the border stores in Germany and works with critical platforms where stability, security and scalability are in focus. 
+
+## About you
+
+We imagine that you have experience from a larger operational or enterprise environment and thrive with responsibility for critical infrastructure where stability, performance and security are crucial.
+
+## In addition, we would like you to:
+
+Have solid experience as a SQL Server DBA, Infrastructure Operations Engineer or from a similar operations role
+Has strong skills within Microsoft SQL Server, T-SQL, performance tuning, operations and security
+Has experience with high availability and disaster recovery solutions in complex environments
+Have knowledge of virtualized platforms and preferably Azure infrastructure and cloud-related services
+Works structured and proactively with automation, optimization and troubleshooting
+Thrives in a technically complex environment with many collaboration interfaces and critical systems
+Is curious, knowledge-sharing and good at communicating with both technical colleagues and partners
+Contributes positively to the team with commitment, job satisfaction and a professional approach
+ 
+
+The position is part of a 24/7 critical duty arrangement, and we therefore expect you to speak and write Danish.

@@ -1,0 +1,2230 @@
+Below are accurate, interview-ready DBA answers with real-world decision logic. 🔨🤖🔧
+
+## 1. Backup time and backup size for a 1.5 TB database
+
+There is no fixed answer. Backup duration depends mainly on:
+
+* Storage read throughput from data files
+* Backup target write throughput
+* Network speed if backing up to share/cloud
+* CPU capacity if compression is enabled
+* Backup type: full, differential, log
+* Database compressibility
+* Number of backup stripes/files
+* Current workload on the server
+
+Example estimate:
+
+```text
+Database size: 1.5 TB = ~1536 GB
+
+If effective backup throughput is 300 MB/sec:
+1536 GB / 300 MB/sec ≈ 87 minutes
+
+If throughput is 600 MB/sec:
+1536 GB / 600 MB/sec ≈ 44 minutes
+
+If throughput is 1 GB/sec:
+1536 GB / 1024 MB/sec ≈ 25 minutes
+```
+
+Backup size depends on used pages, not just MDF file size. With compression:
+
+```text
+Uncompressed backup: maybe 1.2 TB to 1.5 TB
+Compressed backup: commonly 300 GB to 900 GB
+```
+
+A highly transactional or already-compressed/encrypted database may compress poorly. A text-heavy or repeated-data database may compress very well.
+
+---
+
+## 2. Use of the compression option in backup parameters
+
+Backup compression reduces backup file size and often reduces backup duration because SQL Server writes less data to disk. The tradeoff is extra CPU usage during backup and restore. Microsoft documents backup compression as a SQL Server backup feature and notes that compressed backups can be restored by SQL Server 2008 and later editions. ([Microsoft Learn][1])
+
+Example:
+
+```sql
+BACKUP DATABASE MyDB
+TO DISK = 'E:\Backups\MyDB_FULL.bak'
+WITH COMPRESSION, CHECKSUM, STATS = 5;
+```
+
+You can also configure compression as the instance default:
+
+```sql
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+
+EXEC sp_configure 'backup compression default', 1;
+RECONFIGURE;
+```
+
+Microsoft documents `backup compression default` as the server-level setting that determines whether SQL Server creates compressed backups by default. ([Microsoft Learn][2])
+
+---
+
+## 3. Would I use compression or non-compressed backups?
+
+In most production environments, I prefer **compressed backups**, especially for large databases, unless there is a clear CPU bottleneck.
+
+Typical approach:
+
+```text
+Default: Use COMPRESSION
+Exception: Avoid or throttle compression if CPU pressure is already high
+Validation: Test backup duration, restore duration, CPU usage, and backup size
+```
+
+For critical systems, I would benchmark both compressed and uncompressed backups before finalizing the standard.
+
+---
+
+## 4. As a DBA Lead, how would I decide whether to use backup compression?
+
+I would decide based on evidence, not opinion.
+
+I would test:
+
+* Backup duration with and without compression
+* Restore duration with and without compression
+* CPU usage during backup window
+* Backup file size difference
+* Storage cost
+* Network copy/offload time
+* RTO and RPO requirements
+* Impact on application workload
+* Whether TDE or already-compressed data reduces compression benefit
+
+Decision example:
+
+```text
+Use compression if:
+- Backup size reduces significantly
+- Backup duration improves or remains acceptable
+- CPU impact is acceptable
+- Restore testing is successful
+
+Avoid or tune compression if:
+- CPU reaches dangerous levels
+- Application workload is affected
+- Compression ratio is very poor
+```
+
+For Enterprise Edition environments, Resource Governor can also be used to manage CPU impact from backup compression.
+
+---
+
+## 5. Backup retention policy
+
+A common production policy:
+
+```text
+Full backups: retained 2 to 4 weeks locally
+Differential backups: retained 1 to 2 weeks
+Transaction log backups: retained according to point-in-time recovery requirement
+Monthly backups: retained 6 to 12 months
+Yearly backups: retained 5 to 7 years if regulatory requirement exists
+```
+
+Example:
+
+```text
+OLTP critical database:
+- Full backup daily
+- Differential backup every 4 or 6 hours
+- Log backup every 5, 10, or 15 minutes
+- Local retention: 14 days
+- Offsite/cloud retention: 30 to 90 days
+- Long-term archival: monthly/yearly as required
+```
+
+Retention must align with business, legal, audit, and restore requirements.
+
+---
+
+## 6. Backup parameters available in SQL Server
+
+Common `BACKUP DATABASE` options include:
+
+```sql
+WITH
+    COMPRESSION | NO_COMPRESSION,
+    CHECKSUM | NO_CHECKSUM,
+    INIT | NOINIT,
+    FORMAT | NOFORMAT,
+    COPY_ONLY,
+    DIFFERENTIAL,
+    STATS = 5,
+    NAME = 'Backup name',
+    DESCRIPTION = 'Backup description',
+    EXPIREDATE = '2026-12-31',
+    RETAINDAYS = 14,
+    SKIP | NOSKIP,
+    REWIND | NOREWIND,
+    UNLOAD | NOUNLOAD,
+    BLOCKSIZE = 65536,
+    BUFFERCOUNT = 100,
+    MAXTRANSFERSIZE = 4194304,
+    MEDIANAME = 'Media name',
+    MEDIADESCRIPTION = 'Media description',
+    CONTINUE_AFTER_ERROR | STOP_ON_ERROR,
+    ENCRYPTION
+```
+
+Microsoft’s `BACKUP` T-SQL documentation covers full database, file/filegroup, differential, and transaction log backups. ([Microsoft Learn][3])
+
+Example encrypted compressed backup:
+
+```sql
+BACKUP DATABASE MyDB
+TO DISK = 'E:\Backups\MyDB_FULL_Encrypted.bak'
+WITH
+    COMPRESSION,
+    CHECKSUM,
+    STATS = 5,
+    ENCRYPTION
+    (
+        ALGORITHM = AES_256,
+        SERVER CERTIFICATE = BackupEncryptionCert
+    );
+```
+
+---
+
+## 7. Optional backup parameters to reduce backup duration/downtime
+
+Backups generally do **not** take the database offline. SQL Server online backups are designed to run while the database is available.
+
+Options that can reduce duration:
+
+```text
+COMPRESSION
+Multiple backup files / striped backup
+BUFFERCOUNT tuning
+MAXTRANSFERSIZE tuning
+BLOCKSIZE tuning
+Backup to fast local disk first
+Backup to multiple LUNs
+Avoid backup over slow network path
+Use COPY_ONLY for ad hoc backup to avoid disturbing backup chain
+Use differential/log backup strategy instead of frequent full backups
+```
+
+Striped backup example:
+
+```sql
+BACKUP DATABASE MyDB
+TO
+    DISK = 'E:\Backups\MyDB_01.bak',
+    DISK = 'F:\Backups\MyDB_02.bak',
+    DISK = 'G:\Backups\MyDB_03.bak',
+    DISK = 'H:\Backups\MyDB_04.bak'
+WITH
+    COMPRESSION,
+    CHECKSUM,
+    STATS = 5,
+    BUFFERCOUNT = 64,
+    MAXTRANSFERSIZE = 4194304;
+```
+
+---
+
+## 8. Apart from compression, should we consider split backups?
+
+Yes. Split backups, also called **striped backups**, are very important for large databases.
+
+Benefits:
+
+* Parallel writes to multiple backup files
+* Faster backup duration
+* Faster restore duration
+* Better usage of multiple disks/LUNs
+* Easier file movement if each file is smaller
+
+Example:
+
+```sql
+BACKUP DATABASE SalesDB
+TO
+    DISK = '\\BackupShare01\SalesDB_01.bak',
+    DISK = '\\BackupShare02\SalesDB_02.bak',
+    DISK = '\\BackupShare03\SalesDB_03.bak',
+    DISK = '\\BackupShare04\SalesDB_04.bak'
+WITH
+    COMPRESSION,
+    CHECKSUM,
+    STATS = 10;
+```
+
+Important: for restore, all stripes are required.
+
+---
+
+## 9. How to offload backups? Any GPU offloading in SQL Server 2022?
+
+SQL Server 2022 supports backup compression offloading using **Intel QuickAssist Technology**, not GPU offloading. Microsoft describes SQL Server 2022 integrated acceleration and offloading with Intel QAT, which can offload backup compression to reduce CPU usage, backup completion time, and storage consumption. ([Microsoft Learn][4])
+
+Options to offload backups:
+
+```text
+Backup to local fast disk, then copy to network/cloud
+Backup directly to URL/Azure Blob Storage
+Use storage snapshot backups where supported
+Use secondary replica backups in Always On Availability Groups
+Use Intel QAT in SQL Server 2022+
+Use third-party enterprise backup tools
+```
+
+Always On offload example:
+
+```text
+Primary replica: handles application workload
+Secondary replica: preferred backup replica
+Backup jobs: run on preferred secondary
+```
+
+---
+
+## 10. Recovery models available
+
+SQL Server has three recovery models:
+
+```text
+Simple
+Full
+Bulk-logged
+```
+
+Microsoft defines a recovery model as a database property controlling transaction logging, whether log backups are allowed/required, and available restore operations. ([Microsoft Learn][5])
+
+---
+
+## 11. Full vs bulk-logged recovery model
+
+They are not the same.
+
+### Full recovery model
+
+* Fully logs transactions
+* Supports point-in-time recovery
+* Requires transaction log backups
+* Best for critical OLTP databases
+
+### Bulk-logged recovery model
+
+* Variant of full recovery model
+* Minimally logs certain bulk operations
+* Requires log backups
+* May not allow point-in-time recovery through a minimally logged bulk operation
+
+Microsoft describes bulk-logged as a variant of full recovery that permits high-performance bulk copy operations and reduces log space usage through minimal logging for most bulk operations. ([Microsoft Learn][6])
+
+---
+
+## 12. How to choose the best recovery model
+
+I consider:
+
+```text
+RPO: how much data loss is acceptable?
+RTO: how fast must we recover?
+Is point-in-time recovery required?
+Is it production, dev, QA, or reporting?
+How critical is the database?
+Transaction volume
+Log backup storage capacity
+Bulk load frequency
+HA/DR architecture
+Replication, Always On, log shipping requirements
+Compliance/audit requirements
+```
+
+Typical recommendation:
+
+```text
+Production OLTP: Full
+Reporting/staging/rebuildable DB: Simple
+Bulk load window: Temporarily Bulk-logged, if acceptable
+Development/test: Simple, unless PITR testing is required
+```
+
+---
+
+## 13. Should log files be on normal disk or RAID?
+
+For production, transaction log files should not be on a single normal hard drive. They should be on reliable, low-latency storage, commonly RAID 1, RAID 10, or enterprise SAN/NVMe-backed storage.
+
+Best practice:
+
+```text
+Data files: RAID 10 preferred for performance
+Log files: RAID 1 or RAID 10 preferred for sequential write latency
+TempDB: fast dedicated storage
+Backups: separate storage from data/log
+```
+
+Avoid RAID 5/6 for heavy log write workloads because parity write overhead can hurt performance.
+
+---
+
+## 14. RAID 0 and RAID 1
+
+### RAID 0 — striping
+
+```text
+Minimum disks: 2
+Fault tolerance: No
+Performance: High
+Risk: If one disk fails, data is lost
+```
+
+Use RAID 0 only where data loss is acceptable, not for production database files.
+
+### RAID 1 — mirroring
+
+```text
+Minimum disks: 2
+Fault tolerance: Yes
+Performance: Good reads, normal writes
+Risk: Can survive one disk failure
+```
+
+RAID 1 is commonly used for logs or OS volumes.
+
+---
+
+## 15. Dropping online vs offline database
+
+If a database is online:
+
+```sql
+DROP DATABASE MyOnlineDB;
+```
+
+SQL Server drops it, assuming no active connections block the operation and you have permission.
+
+If users are connected, you may need:
+
+```sql
+ALTER DATABASE MyOnlineDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+DROP DATABASE MyOnlineDB;
+```
+
+If a database is offline:
+
+```sql
+DROP DATABASE MyOfflineDB;
+```
+
+SQL Server can drop the database metadata, but the physical files may not always be deleted automatically depending on file accessibility/state. As a DBA, I verify and manually remove orphaned MDF/NDF/LDF files if required.
+
+---
+
+## 16. Always On experience / POC answer
+
+A strong interview answer:
+
+```text
+Yes, I have configured Always On Availability Groups in lab and production-like environments. I configured Windows Server Failover Cluster, enabled Always On at SQL Server level, created endpoints, configured replicas, listener, synchronization mode, automatic/manual failover, backup preference, and tested failover/failback scenarios.
+```
+
+Common steps:
+
+```text
+1. Build Windows Failover Cluster
+2. Install SQL Server on each node
+3. Enable Always On Availability Groups
+4. Configure endpoints and permissions
+5. Take full/log backups
+6. Restore database WITH NORECOVERY on secondary
+7. Create Availability Group
+8. Add listener
+9. Test failover
+10. Configure jobs, logins, linked servers, alerts
+```
+
+---
+
+## 17. Mirroring is deprecated — what does deprecated mean?
+
+Deprecated means the feature is still available, but Microsoft does not recommend using it for new development because it may be removed in a future version. Microsoft’s deprecation guidance says deprecated features should not be used in new applications. ([Microsoft Learn][7])
+
+So, database mirroring may still work, but for new designs we should use Always On Availability Groups or Basic Availability Groups.
+
+---
+
+## 18. Difference between Mirroring and Always On
+
+| Feature              |             Database Mirroring |            Always On Availability Groups |
+| -------------------- | -----------------------------: | ---------------------------------------: |
+| Scope                |                Single database |                       Group of databases |
+| Secondary readable   | No, except snapshot workaround | Yes, in readable secondary configuration |
+| Multiple secondaries |                             No |                                      Yes |
+| Listener             |          Limited/witness model |                              AG listener |
+| Backup on secondary  |                             No |                                      Yes |
+| Failover             |                 Database level |                                 AG level |
+| Status               |                     Deprecated |                Recommended HA/DR feature |
+
+Microsoft notes that Basic Availability Groups replace the deprecated Database Mirroring feature and provide similar feature support. ([Microsoft Learn][8])
+
+---
+
+## 19. Can Mirroring and Always On be configured on the same database?
+
+No. The same database cannot simultaneously participate in database mirroring and Always On Availability Groups.
+
+Reason:
+
+```text
+Both technologies control database synchronization and recovery state.
+A database can participate in one HA data-movement technology of this type at a time.
+```
+
+You can migrate from mirroring to Always On, but not combine both on the same database.
+
+---
+
+## 20. How to convince client to upgrade from SQL Server 2012/2014/2016 to 2019/2022
+
+I would present this as a risk, supportability, security, and business-continuity discussion.
+
+Key points:
+
+```text
+Security patches and compliance
+Vendor support
+Performance improvements
+Query Store improvements
+Better cardinality estimator
+Intelligent Query Processing
+Always On enhancements
+Backup and restore improvements
+TDE and encryption improvements
+Better Azure integration
+Lower operational risk
+Avoid unsupported platform during audit
+```
+
+SQL Server 2016 extended support ends July 14, 2026 according to Microsoft Lifecycle. ([Microsoft Learn][9]) SQL Server 2014 already reached end of support on July 9, 2024, and SQL Server 2012 reached end of support on July 12, 2022, unless covered by Extended Security Updates. ([Lansweeper][10])
+
+Upgrade approach:
+
+```text
+1. Run Data Migration Assistant
+2. Check deprecated features
+3. Capture workload baseline
+4. Test compatibility level
+5. Test application regression
+6. Perform backup/restore or side-by-side migration
+7. Validate performance
+8. Prepare rollback plan
+```
+
+---
+
+## 21. What is TDE and impact on results/performance?
+
+TDE means **Transparent Data Encryption**. It encrypts data files, log files, and backups at rest. Applications and queries do not need code changes.
+
+Microsoft describes TDE as encryption of SQL Server data files, also known as encrypting data at rest. ([Microsoft Learn][11])
+
+Query result impact:
+
+```text
+No change in query results.
+SELECT statements return the same data.
+Application behavior remains the same.
+```
+
+Performance impact:
+
+```text
+Some CPU overhead
+More noticeable on write-heavy workloads
+Can affect backup compression ratio
+TempDB is encrypted if any user DB uses TDE
+Modern CPUs with AES-NI reduce overhead
+```
+
+Important DBA task:
+
+```text
+Back up the certificate and private key immediately.
+Without them, restoring encrypted backups may be impossible.
+```
+
+---
+
+## 22. Execution plans and how to read them
+
+Yes. Execution plans show how SQL Server executes a query.
+
+I look at:
+
+```text
+Estimated vs actual rows
+Index seek vs index scan
+Join types
+Sorts
+Spools
+Key lookups
+Warnings
+Memory grants
+Parallelism
+Predicate pushdown
+Missing indexes
+Implicit conversions
+Statistics issues
+Operator cost distribution
+```
+
+Important: I do not tune only by percentage cost. I compare estimates vs actuals and identify the real bottleneck.
+
+---
+
+## 23. Operators commonly seen in performance troubleshooting
+
+Common operators:
+
+```text
+Index Seek
+Index Scan
+Table Scan
+Key Lookup
+RID Lookup
+Nested Loops
+Hash Match
+Merge Join
+Sort
+Filter
+Compute Scalar
+Stream Aggregate
+Hash Aggregate
+Concatenation
+Parallelism / Exchange
+Eager Spool
+Lazy Spool
+Bitmap
+Clustered Index Seek
+Clustered Index Scan
+```
+
+Red flags:
+
+```text
+Table Scan on huge table
+Index Scan with bad predicate
+Key Lookup repeated millions of times
+Hash Match spill
+Sort spill
+Huge memory grant
+Implicit conversion
+Bad cardinality estimate
+Parallelism skew
+```
+
+---
+
+## 24. Page compression and available SQL Server compression types
+
+SQL Server supports:
+
+```text
+Row compression
+Page compression
+Columnstore compression
+Columnstore archival compression
+Backup compression
+Unicode compression
+```
+
+Page compression includes:
+
+```text
+Row compression
+Prefix compression
+Dictionary compression
+```
+
+I use page compression mainly for read-heavy large tables/indexes where CPU overhead is acceptable and storage/I/O savings are significant.
+
+Check compression savings:
+
+```sql
+EXEC sp_estimate_data_compression_savings
+    @schema_name = 'dbo',
+    @object_name = 'SalesOrderDetail',
+    @index_id = NULL,
+    @partition_number = NULL,
+    @data_compression = 'PAGE';
+```
+
+Apply page compression:
+
+```sql
+ALTER INDEX ALL ON dbo.SalesOrderDetail
+REBUILD WITH (DATA_COMPRESSION = PAGE);
+```
+
+---
+
+## 25. Capacity planning for next 6 months
+
+Capacity planning means forecasting future storage, CPU, memory, and workload needs so the SQL Server environment does not run out of resources.
+
+For data/log growth:
+
+```text
+Collect current database size
+Collect daily/weekly/monthly growth
+Review backup size growth
+Review log generation rate
+Review autogrowth events
+Review business events: new apps, archive purge, migration, seasonality
+Forecast 3, 6, 12 months
+Add safety buffer, usually 20–30%
+```
+
+Example report columns:
+
+```text
+DatabaseName
+CurrentDataSizeGB
+CurrentLogSizeGB
+UsedSpaceGB
+FreeSpaceGB
+AvgMonthlyGrowthGB
+Projected6MonthGrowthGB
+RequiredSpaceWithBufferGB
+DriveFreeSpaceGB
+RiskLevel
+Recommendation
+```
+
+---
+
+## 26. Where to get data growth and historical space information
+
+Sources:
+
+```text
+msdb backup history
+SQL Agent job output
+DBA repository tables
+Monitoring tools: SCOM, SolarWinds, Redgate, Idera, Datadog
+Default trace / Extended Events for autogrowth
+sys.master_files
+sys.database_files
+sys.dm_db_file_space_usage
+sys.dm_db_log_space_usage
+sp_spaceused snapshots
+Query Store for workload trends
+Storage/SAN reports
+```
+
+Useful backup history query:
+
+```sql
+SELECT
+    bs.database_name,
+    CAST(bs.backup_start_date AS date) AS backup_date,
+    bs.type AS backup_type,
+    SUM(bs.backup_size) / 1024.0 / 1024 / 1024 AS backup_size_gb,
+    SUM(bs.compressed_backup_size) / 1024.0 / 1024 / 1024 AS compressed_backup_size_gb
+FROM msdb.dbo.backupset AS bs
+GROUP BY
+    bs.database_name,
+    CAST(bs.backup_start_date AS date),
+    bs.type
+ORDER BY
+    backup_date DESC,
+    bs.database_name;
+```
+
+Current file size query:
+
+```sql
+SELECT
+    DB_NAME(database_id) AS database_name,
+    type_desc,
+    name AS logical_file_name,
+    physical_name,
+    size / 128.0 AS size_mb
+FROM sys.master_files
+ORDER BY database_name, type_desc;
+```
+
+---
+
+## 27. Events recorded in default system_health Extended Events
+
+The `system_health` session starts automatically when the SQL Server Database Engine starts and collects troubleshooting data with minimal overhead. ([Microsoft Learn][12])
+
+Commonly captured information includes:
+
+```text
+Deadlocks
+Severe errors
+Non-yielding schedulers
+Scheduler monitor events
+Memory-related issues
+Long waits / blocked process style diagnostics
+Security ring buffer information
+Connectivity/system diagnostics
+```
+
+Query system_health files:
+
+```sql
+SELECT
+    CAST(event_data AS XML) AS event_data
+FROM sys.fn_xe_file_target_read_file
+(
+    'system_health*.xel',
+    NULL,
+    NULL,
+    NULL
+);
+```
+
+---
+
+## 28. How to install SQL Server
+
+Methods:
+
+```text
+GUI installation using setup wizard
+Command-line installation
+Configuration file installation
+Slipstream installation with updates
+PowerShell automation
+Desired State Configuration
+Image/template-based deployment
+```
+
+Command-line example:
+
+```cmd
+setup.exe /Q /ACTION=Install /FEATURES=SQLENGINE ^
+/INSTANCENAME=MSSQLSERVER ^
+/SQLSVCACCOUNT="DOMAIN\sqlsvc" ^
+/SQLSVCPASSWORD="StrongPassword" ^
+/AGTSVCACCOUNT="DOMAIN\sqlagent" ^
+/AGTSVCPASSWORD="StrongPassword" ^
+/SQLSYSADMINACCOUNTS="DOMAIN\DBAGroup" ^
+/TCPENABLED=1 ^
+/IACCEPTSQLSERVERLICENSETERMS
+```
+
+---
+
+## 29. What are configuration.ini and summary.txt?
+
+### configuration.ini
+
+This file contains installation parameters selected during setup. It can be reused for unattended or standardized SQL Server installations.
+
+Example:
+
+```cmd
+setup.exe /ConfigurationFile=C:\Install\ConfigurationFile.ini
+```
+
+Useful for:
+
+```text
+Repeatable builds
+Automation
+Standardization
+Reducing manual errors
+DR rebuild documentation
+```
+
+### summary.txt
+
+`summary.txt` is generated after installation. It records installation result, selected features, success/failure status, and log file locations.
+
+Use it for:
+
+```text
+Installation validation
+Troubleshooting failed setup
+Audit/documentation
+Handover evidence
+```
+
+---
+
+## 30. SQL Server installation using DSC
+
+Yes, SQL Server can be installed using PowerShell DSC. In enterprise automation, DSC is used to ensure SQL Server configuration remains consistent.
+
+Typical DSC can manage:
+
+```text
+SQL Server installation
+Features
+Service accounts
+Max memory
+TempDB configuration
+Trace flags/startup parameters
+Database creation
+Logins
+Permissions
+Always On settings
+```
+
+---
+
+## 31. Moving system database files
+
+### Moving TempDB
+
+TempDB is easiest because files are recreated at startup.
+
+```sql
+ALTER DATABASE tempdb
+MODIFY FILE
+(
+    NAME = tempdev,
+    FILENAME = 'T:\TempDB\tempdb.mdf'
+);
+
+ALTER DATABASE tempdb
+MODIFY FILE
+(
+    NAME = templog,
+    FILENAME = 'T:\TempDB\templog.ldf'
+);
+```
+
+Then restart SQL Server.
+
+### Moving model/msdb
+
+For `model` and `msdb`:
+
+```text
+1. ALTER DATABASE MODIFY FILE
+2. Stop SQL Server
+3. Move physical files
+4. Start SQL Server
+5. Verify file location
+```
+
+### Moving master
+
+Master is different because SQL Server needs master during startup. You must change SQL Server startup parameters:
+
+```text
+-d new master data file path
+-l new master log file path
+-e error log path if needed
+```
+
+Then stop SQL Server, move files, and start SQL Server.
+
+---
+
+## 32. Primary key vs unique key constraint
+
+| Feature               |                         Primary Key |                  Unique Key |
+| --------------------- | ----------------------------------: | --------------------------: |
+| Purpose               |                 Identifies each row |         Enforces uniqueness |
+| NULL allowed          |                                  No |     Yes, generally one NULL |
+| Per table             |                     One primary key | Multiple unique constraints |
+| Default index         | Clustered by default if none exists |     Nonclustered by default |
+| Foreign key reference |                 Commonly referenced |      Can also be referenced |
+
+---
+
+## 33. What index is automatically created?
+
+By default:
+
+```text
+Primary key -> clustered unique index, unless specified otherwise
+Unique constraint -> nonclustered unique index, unless specified otherwise
+```
+
+Examples:
+
+```sql
+ALTER TABLE dbo.Customer
+ADD CONSTRAINT PK_Customer
+PRIMARY KEY CLUSTERED (CustomerID);
+```
+
+```sql
+ALTER TABLE dbo.Customer
+ADD CONSTRAINT UQ_Customer_Email
+UNIQUE NONCLUSTERED (EmailAddress);
+```
+
+Important: a table can have only one clustered index, so if one already exists, the primary key must be nonclustered or the existing clustered index must be changed.
+
+---
+
+## 34. Which recovery model is suitable for transaction replication?
+
+Transactional replication can function with simple, full, or bulk-logged recovery models. Microsoft’s replication FAQ states replication functions properly using any recovery model and that transactional replication tracks changes by marking the transaction log, not by depending on the recovery model. ([Microsoft Learn][13])
+
+However, in real production systems, I usually prefer **Full recovery model** for critical publisher databases because it supports point-in-time recovery.
+
+---
+
+## 35. Major/difficult DBA issues encountered
+
+Strong examples:
+
+```text
+1. Large transaction log growth due to missing log backups
+2. Blocking/deadlock storm during business hours
+3. TempDB contention and version store growth
+4. Always On synchronization lag
+5. Failed failover due to missing logins/jobs on secondary
+6. Backup chain broken by unexpected ad hoc backup
+7. Corruption detected by DBCC CHECKDB
+8. Poor query performance after upgrade due to cardinality estimator changes
+9. Disk full due to uncontrolled autogrowth
+10. TDE certificate missing during restore testing
+```
+
+Example answer:
+
+```text
+One difficult issue I handled was sudden transaction log growth on a critical OLTP database. I checked log_reuse_wait_desc, found that log backups were failing, fixed the backup job, took log backups, validated recovery chain, resized the log properly, and added monitoring for log usage and backup failure alerts.
+```
+
+Useful query:
+
+```sql
+SELECT
+    name,
+    recovery_model_desc,
+    log_reuse_wait_desc
+FROM sys.databases
+ORDER BY name;
+```
+
+---
+
+## 36. Azure database migrations from on-premises
+
+Yes, a DBA should be comfortable with Azure migration paths such as:
+
+```text
+SQL Server on Azure VM
+Azure SQL Managed Instance
+Azure SQL Database
+Azure SQL Hyperscale
+```
+
+Migration methods:
+
+```text
+Backup and restore to Azure VM or Managed Instance
+Azure Database Migration Service
+Log shipping-style migration
+Transactional replication for low downtime
+BACPAC for smaller/simple databases
+Distributed Availability Groups
+Azure Data Studio migration extension
+```
+
+Migration assessment checklist:
+
+```text
+Run Data Migration Assistant
+Check compatibility issues
+Check SQL Agent jobs
+Check linked servers
+Check CLR, Service Broker, cross-database queries
+Check unsupported features for Azure SQL Database
+Estimate DTU/vCore/storage
+Plan cutover and rollback
+Test performance after migration
+Validate security, users, logins, permissions
+```
+
+For client recommendation:
+
+```text
+If they need near-full SQL Server compatibility: Azure SQL Managed Instance
+If they need OS-level control: SQL Server on Azure VM
+If they want PaaS and app supports it: Azure SQL Database
+```
+
+✔️ Final DBA mindset: every choice—backup compression, recovery model, HA/DR, storage, retention, upgrade, or cloud migration—must be driven by **RPO, RTO, workload, cost, compliance, and tested restore capability**.
+
+## 1. Brief introduction about career journey and day-to-day activities
+
+A good answer:
+
+> I have been working as a SQL Server DBA, handling installation, configuration, backup and recovery, performance tuning, security, high availability, disaster recovery, patching, monitoring, and troubleshooting. My day-to-day activities include checking SQL Server health, validating backups, monitoring jobs, resolving blocking/deadlocks, reviewing disk/CPU/memory usage, handling user access requests, performance tuning slow queries, supporting deployments, managing HA/DR solutions such as log shipping, mirroring, or Always On, and coordinating with application, infrastructure, storage, and network teams.
+
+You can also say:
+
+> My primary focus as a DBA is database availability, recoverability, performance, security, and capacity planning.
+
+---
+
+## 2. Basic prerequisites for standalone SQL Server installation
+
+Before installing SQL Server on a standalone server, I verify:
+
+```text
+Operating system compatibility
+SQL Server edition/version compatibility
+CPU, RAM, and disk capacity
+.NET Framework / required Windows components
+Domain/workgroup requirement
+Service accounts for SQL Server Engine and Agent
+Admin access on the server
+Disk layout for data, log, TempDB, and backups
+Collation requirement
+Instance name: default or named
+Authentication mode
+Firewall ports
+Windows updates / pending reboot status
+Antivirus exclusions
+SQL Server license availability
+```
+
+Recommended disk layout:
+
+```text
+C: OS and SQL binaries
+D: Data files
+L: Log files
+T: TempDB
+B: Backups
+```
+
+---
+
+## 3. Authentication modes in SQL Server
+
+SQL Server supports two authentication modes:
+
+```text
+Windows Authentication Mode
+Mixed Mode Authentication
+```
+
+### Windows Authentication
+
+Users connect using Windows/Active Directory credentials.
+
+### Mixed Mode Authentication
+
+Both Windows logins and SQL Server logins are allowed.
+
+Example SQL login:
+
+```sql
+CREATE LOGIN AppUser
+WITH PASSWORD = 'UseAStrongPasswordHere!';
+```
+
+---
+
+## 4. Can SQL Server be installed without a default instance?
+
+Yes. It is **not mandatory** to install a default instance first.
+
+You can install:
+
+```text
+Default instance
+Named instance only
+Multiple named instances
+Default instance + named instances
+```
+
+Default instance connection:
+
+```text
+ServerName
+```
+
+Named instance connection:
+
+```text
+ServerName\InstanceName
+```
+
+A server can have only one default instance, but it can have multiple named instances.
+
+---
+
+## 5. Importance of backups from a DBA perspective
+
+Backups are one of the most critical DBA responsibilities because they protect the business from:
+
+```text
+Database corruption
+Accidental data deletion
+Application bugs
+Hardware failure
+Ransomware/security incidents
+Disaster recovery scenarios
+Failed deployments
+Human mistakes
+```
+
+Important DBA mindset:
+
+> A backup is useful only if it can be restored successfully.
+
+So, I always recommend:
+
+```text
+Backup validation
+CHECKSUM backups
+Regular restore testing
+Retention policy
+Offsite copies
+Monitoring and alerting
+Documented restore steps
+```
+
+---
+
+## 6. Traditional backup types recommended by DBA
+
+Common backup types:
+
+```text
+Full backup
+Differential backup
+Transaction log backup
+Copy-only backup
+File/filegroup backup
+Tail-log backup
+Partial backup
+```
+
+Typical production strategy:
+
+```text
+Full backup: daily or weekly
+Differential backup: every few hours or daily
+Transaction log backup: every 5, 10, or 15 minutes
+```
+
+For critical databases in full recovery model, transaction log backups are mandatory to support point-in-time recovery.
+
+---
+
+## 7. Scenario: Full Sunday 10 p.m., differential daily 9 p.m., log backup every 15 minutes, corruption Tuesday 7:30 a.m.
+
+Requirement: recover database to Tuesday 7:30 a.m.
+
+Backup chain:
+
+```text
+Sunday 10:00 p.m.      Full backup
+Monday 9:00 p.m.       Differential backup
+Tuesday 12:00 a.m. onward log backups every 15 minutes
+Tuesday 7:30 a.m.      Target recovery time
+```
+
+Restore sequence:
+
+```text
+1. Restore Sunday full backup WITH NORECOVERY
+2. Restore Monday 9 p.m. differential backup WITH NORECOVERY
+3. Restore transaction log backups from after Monday 9 p.m.
+4. Restore logs up to the log backup containing Tuesday 7:30 a.m.
+5. Use STOPAT = 'Tuesday 07:30:00'
+6. Final restore WITH RECOVERY
+```
+
+Microsoft documents that for point-in-time restore, you first restore a full backup before the target time, then restore the log backups and specify the same `STOPAT` target in the restore sequence. ([Microsoft Learn][1])
+
+Example:
+
+```sql
+-- 1. Restore full backup
+RESTORE DATABASE MyDB
+FROM DISK = 'E:\Backups\MyDB_FULL_Sunday_2200.bak'
+WITH NORECOVERY, REPLACE;
+
+-- 2. Restore latest differential backup before failure
+RESTORE DATABASE MyDB
+FROM DISK = 'E:\Backups\MyDB_DIFF_Monday_2100.bak'
+WITH NORECOVERY;
+
+-- 3. Restore log backups after the differential
+RESTORE LOG MyDB
+FROM DISK = 'E:\Backups\MyDB_LOG_Tuesday_0000.trn'
+WITH NORECOVERY;
+
+RESTORE LOG MyDB
+FROM DISK = 'E:\Backups\MyDB_LOG_Tuesday_0015.trn'
+WITH NORECOVERY;
+
+-- Continue all log backups in sequence...
+
+-- 4. Restore final log backup containing 7:30 a.m.
+RESTORE LOG MyDB
+FROM DISK = 'E:\Backups\MyDB_LOG_Tuesday_0730.trn'
+WITH
+    STOPAT = '2026-06-02T07:30:00',
+    RECOVERY;
+```
+
+Important: If the database is still accessible and you want to minimize data loss, take a tail-log backup before restoring.
+
+---
+
+## 8. Difference between normal transaction log backup and tail-log backup command
+
+### Normal log backup
+
+```sql
+BACKUP LOG MyDB
+TO DISK = 'E:\Backups\MyDB_LOG_Regular.trn'
+WITH CHECKSUM, STATS = 5;
+```
+
+### Tail-log backup
+
+A tail-log backup captures log records not yet backed up, usually immediately before restore after a failure. Microsoft states that tail-log backups capture the tail of the log to prevent work loss and keep the log chain intact. ([Microsoft Learn][2])
+
+```sql
+BACKUP LOG MyDB
+TO DISK = 'E:\Backups\MyDB_TailLog.trn'
+WITH NORECOVERY, CHECKSUM, STATS = 5;
+```
+
+If the database is damaged and normal backup is not possible:
+
+```sql
+BACKUP LOG MyDB
+TO DISK = 'E:\Backups\MyDB_TailLog.trn'
+WITH CONTINUE_AFTER_ERROR, NO_TRUNCATE;
+```
+
+Main difference:
+
+```text
+Normal log backup:
+- Routine backup
+- Database remains online
+
+Tail-log backup:
+- Taken before restore/recovery operation
+- Captures final unbacked log records
+- Often uses WITH NORECOVERY
+```
+
+---
+
+## 9. `WITH STOPAT` clause
+
+Yes. `WITH STOPAT` is used for point-in-time recovery.
+
+Example:
+
+```sql
+RESTORE LOG MyDB
+FROM DISK = 'E:\Backups\MyDB_LOG_0730.trn'
+WITH
+    STOPAT = '2026-06-02T07:30:00',
+    RECOVERY;
+```
+
+It is used when you want to restore only up to a specific date/time, for example before accidental delete/drop/corruption.
+
+---
+
+## 10. Restore modes / restoring states in SQL Server
+
+The three common restore states are:
+
+```text
+WITH RECOVERY
+WITH NORECOVERY
+WITH STANDBY
+```
+
+---
+
+## 11. Difference between `WITH RECOVERY`, `WITH NORECOVERY`, `WITH STANDBY`
+
+| Restore option    | Database state    | Usage                             |
+| ----------------- | ----------------- | --------------------------------- |
+| `WITH RECOVERY`   | Online and usable | Final restore step                |
+| `WITH NORECOVERY` | Restoring state   | More backups need to be applied   |
+| `WITH STANDBY`    | Read-only mode    | Allows reads between log restores |
+
+### `WITH RECOVERY`
+
+```sql
+RESTORE DATABASE MyDB
+FROM DISK = 'E:\Backups\MyDB_FULL.bak'
+WITH RECOVERY;
+```
+
+Use when no more backups need to be restored.
+
+### `WITH NORECOVERY`
+
+```sql
+RESTORE DATABASE MyDB
+FROM DISK = 'E:\Backups\MyDB_FULL.bak'
+WITH NORECOVERY;
+```
+
+Use when you need to restore differential or log backups next.
+
+### `WITH STANDBY`
+
+```sql
+RESTORE LOG MyDB
+FROM DISK = 'E:\Backups\MyDB_LOG.trn'
+WITH STANDBY = 'E:\Undo\MyDB_Undo.tuf';
+```
+
+Use mostly in log shipping when the secondary database must be readable between restores.
+
+---
+
+## 12. Default files created in a simple database
+
+By default, SQL Server creates:
+
+```text
+Primary data file: .mdf
+Transaction log file: .ldf
+```
+
+Example:
+
+```sql
+CREATE DATABASE TestDB;
+```
+
+This creates:
+
+```text
+TestDB.mdf
+TestDB_log.ldf
+```
+
+Optional secondary data files use `.ndf`.
+
+---
+
+## 13. Recovery models in SQL Server
+
+SQL Server has three recovery models:
+
+```text
+Simple
+Full
+Bulk-logged
+```
+
+---
+
+## 14. Bulk-logged recovery model vs simple recovery model
+
+### Simple recovery model
+
+```text
+Transaction log is automatically truncated
+No transaction log backups
+No point-in-time recovery
+Suitable for dev/test/staging or non-critical databases
+```
+
+### Bulk-logged recovery model
+
+```text
+Requires log backups
+Supports restore chain
+Minimally logs certain bulk operations
+Can reduce log growth during bulk load operations
+Point-in-time recovery may not be possible through minimally logged operations
+```
+
+Examples of minimally logged operations may include:
+
+```text
+BULK INSERT
+SELECT INTO
+Index rebuilds, depending on conditions
+BCP operations
+```
+
+Difference:
+
+```text
+Simple:
+- Cannot take log backups
+- Cannot do point-in-time restore
+
+Bulk-logged:
+- Can take log backups
+- Maintains log chain
+- Used temporarily during large bulk operations
+```
+
+---
+
+## 15. BCM page — Bulk Changed Map
+
+Yes. BCM means **Bulk Changed Map**.
+
+It tracks extents modified by minimally logged bulk operations since the last log backup. It is mainly relevant in the bulk-logged recovery model.
+
+Related allocation map pages:
+
+```text
+GAM  - Global Allocation Map
+SGAM - Shared Global Allocation Map
+PFS  - Page Free Space
+DCM  - Differential Changed Map
+BCM  - Bulk Changed Map
+```
+
+Practical DBA explanation:
+
+```text
+DCM helps differential backups identify changed extents since last full backup.
+BCM helps SQL Server track extents changed by bulk-logged operations.
+```
+
+---
+
+## 16. Scenario: Refresh production copy to test database that is part of log shipping, without disturbing existing log shipping
+
+Important point: If the test database is the **secondary database in log shipping**, restoring a fresh production copy over it will usually break the existing restore chain unless handled carefully.
+
+Safest approach:
+
+```text
+1. Disable log shipping restore job on secondary temporarily.
+2. Confirm no restore is running.
+3. Take latest full backup from primary.
+4. Optionally take latest differential backup.
+5. Restore full backup on test/secondary database WITH NORECOVERY or STANDBY.
+6. Restore latest differential WITH NORECOVERY or STANDBY.
+7. Restore all required log backups generated after that full/diff backup.
+8. Re-enable log shipping restore job.
+9. Validate LSN chain using restore history/log shipping monitor.
+```
+
+If the customer wants the database readable after refresh:
+
+```sql
+RESTORE DATABASE TestDB
+FROM DISK = 'E:\Backups\ProdDB_FULL.bak'
+WITH
+    STANDBY = 'E:\LogShippingUndo\TestDB.tuf',
+    REPLACE;
+```
+
+But normally you restore full backup `WITH NORECOVERY`, then apply logs, then leave it in `STANDBY` if read-only access is required.
+
+Key rule:
+
+> The refreshed database must be restored to a point where the next log shipping transaction log backup can be applied. Otherwise, log shipping will fail due to LSN mismatch.
+
+---
+
+## 17. Usage of TUF file in log shipping
+
+TUF means **Transaction Undo File**.
+
+It is used when the secondary database is in standby/read-only mode.
+
+Purpose:
+
+```text
+Stores uncommitted transaction undo information
+Allows database to be readable between log restores
+Required to roll back uncommitted transactions temporarily
+Used again when next log backup is restored
+```
+
+Example:
+
+```sql
+RESTORE LOG SecondaryDB
+FROM DISK = 'E:\LogShipping\PrimaryDB_001.trn'
+WITH STANDBY = 'E:\LogShipping\SecondaryDB.tuf';
+```
+
+If the TUF file is missing or corrupted, log restores in standby mode can fail.
+
+---
+
+## 18. Scenario: Add new data file to primary database involved in log shipping
+
+If you add a new data file on the primary, that file addition is logged and will be replayed on the secondary during log restore.
+
+The risk is this:
+
+```text
+The same file path must exist on the secondary server.
+```
+
+Best approach:
+
+```text
+1. Check existing data file paths on primary and secondary.
+2. Create the required folder/path on secondary before adding the file.
+3. Add the file on primary.
+4. Take log backup.
+5. Let log shipping copy and restore job apply it.
+6. Validate secondary database files.
+```
+
+Example on primary:
+
+```sql
+ALTER DATABASE MyDB
+ADD FILE
+(
+    NAME = MyDB_Data02,
+    FILENAME = 'D:\SQLData\MyDB_Data02.ndf',
+    SIZE = 10GB,
+    FILEGROWTH = 1GB
+);
+```
+
+If the secondary does not have `D:\SQLData\`, the restore job may fail.
+
+If primary and secondary use different paths, you may need careful planning, restore with `MOVE` during reinitialization, or standardized mount points.
+
+---
+
+## 19. Can one database use multiple HA concepts simultaneously?
+
+Sometimes yes, but not all combinations are allowed.
+
+Examples:
+
+```text
+Database mirroring + log shipping: possible
+Always On Availability Groups + log shipping: possible in some DR designs
+Database mirroring + Always On AG on same database: not supported
+Replication + Always On/log shipping: possible with planning
+```
+
+A common old design was:
+
+```text
+Primary database mirrored to DR server
+Log shipping also configured from principal to another reporting/DR server
+```
+
+But you cannot have the same database simultaneously controlled by both database mirroring and Always On Availability Group.
+
+---
+
+## 20. Major difference between log shipping and database mirroring
+
+| Feature              | Log Shipping               | Database Mirroring              |
+| -------------------- | -------------------------- | ------------------------------- |
+| Method               | Backup, copy, restore logs | Continuous send/redo            |
+| Failover             | Manual                     | Automatic possible with witness |
+| Secondary readable   | Yes, using standby mode    | No, except database snapshot    |
+| Latency              | Usually minutes            | Near real-time                  |
+| Multiple secondaries | Yes                        | No                              |
+| Database state       | Restoring or standby       | Mirror/restoring                |
+| Technology status    | Still used                 | Deprecated                      |
+
+Log shipping is simpler and good for DR/reporting. Mirroring is more HA-focused but deprecated.
+
+---
+
+## 21. What replaced mirroring limitations for readable secondaries?
+
+The newer concept is **Always On Availability Groups**.
+
+It introduced:
+
+```text
+Readable secondary replicas
+Multiple secondary replicas
+AG listener
+Backup offloading
+Automatic/manual failover
+Synchronous/asynchronous commit
+Better HA/DR architecture
+```
+
+---
+
+## 22. Can backups be performed on secondary replica in Always On?
+
+Yes. Always On Availability Groups support backup offloading to secondary replicas. Microsoft documents backup configuration for secondary replicas in Always On Availability Groups. ([Microsoft Learn][3])
+
+Common backup types on secondary:
+
+```text
+Copy-only full backup
+Transaction log backup
+File/filegroup backups in some cases
+```
+
+Important limitation:
+
+```text
+Regular full backups and differential backups are normally performed on the primary replica.
+```
+
+---
+
+## 23. In Always On “Prefer Secondary”, which backups run on secondary vs primary?
+
+With **Prefer Secondary**:
+
+```text
+Log backups: Prefer secondary replica
+Copy-only full backups: Can run on secondary
+Regular full backups: Primary
+Differential backups: Primary
+```
+
+Microsoft’s Azure Backup documentation summarizes AG backup preference behavior: with “Prefer secondary,” backups should occur on a secondary except when the primary is the only replica online; however, full/differential behavior depends on supported backup type and SQL Server backup rules. ([Microsoft Learn][4])
+
+Best practice is to use:
+
+```sql
+SELECT sys.fn_hadr_backup_is_preferred_replica('MyDB') AS IsPreferredBackupReplica;
+```
+
+Example backup job logic:
+
+```sql
+IF sys.fn_hadr_backup_is_preferred_replica('MyDB') = 1
+BEGIN
+    BACKUP LOG MyDB
+    TO DISK = 'E:\Backups\MyDB_LOG.trn'
+    WITH COMPRESSION, CHECKSUM, STATS = 5;
+END;
+```
+
+---
+
+## 24. SQL Server port 1433 and 1434
+
+### Port 1433
+
+```text
+TCP 1433 is the default port for the SQL Server Database Engine default instance.
+```
+
+Microsoft states that the default SQL Server Database Engine instance listens on TCP port 1433 when enabled. ([Microsoft Learn][5])
+
+### Port 1434
+
+```text
+UDP 1434 is used by SQL Server Browser service.
+```
+
+It helps clients locate named instances and determine their dynamic ports. Microsoft documents UDP 1434 as the SQL Server Browser service port. ([Microsoft Learn][6])
+
+---
+
+## 25. Main usage of SQL Server Browser service
+
+SQL Server Browser helps clients connect to named instances.
+
+It provides:
+
+```text
+Instance name resolution
+Dynamic port lookup
+Named instance discovery
+```
+
+Example:
+
+```text
+Client connects to ServerA\SQL2019
+Browser service tells client which TCP port SQL2019 is listening on
+```
+
+If SQL Browser is stopped, clients can still connect if they specify the port directly:
+
+```text
+ServerA,51433
+```
+
+For security, many environments disable SQL Browser and use static ports.
+
+---
+
+## 26. Scenario: Stored procedure used to run in seconds, now taking 30 minutes
+
+Troubleshooting approach:
+
+### Step 1: Confirm the issue
+
+```text
+Which stored procedure?
+Which database?
+When did it start?
+All users or one user?
+Same parameters or different parameters?
+Any recent deployment?
+Any data growth?
+Any index/statistics maintenance changes?
+```
+
+### Step 2: Check current execution
+
+```sql
+SELECT
+    r.session_id,
+    r.status,
+    r.command,
+    r.cpu_time,
+    r.total_elapsed_time,
+    r.reads,
+    r.writes,
+    r.logical_reads,
+    r.wait_type,
+    r.blocking_session_id,
+    t.text
+FROM sys.dm_exec_requests r
+CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+WHERE t.text LIKE '%ProcedureName%';
+```
+
+### Step 3: Check blocking
+
+```sql
+SELECT
+    blocking_session_id,
+    session_id,
+    wait_type,
+    wait_time,
+    wait_resource
+FROM sys.dm_exec_requests
+WHERE blocking_session_id <> 0;
+```
+
+### Step 4: Check execution plan
+
+Look for:
+
+```text
+Plan change
+Parameter sniffing
+Bad cardinality estimates
+Missing index
+Index scan instead of seek
+Key lookup explosion
+Sort/hash spills
+Implicit conversions
+Outdated statistics
+Parallelism waits
+TempDB spills
+```
+
+### Step 5: Compare historical performance
+
+Use Query Store if enabled:
+
+```sql
+SELECT
+    qsq.query_id,
+    qsp.plan_id,
+    rs.avg_duration,
+    rs.avg_cpu_time,
+    rs.avg_logical_io_reads,
+    rs.count_executions,
+    rs.last_execution_time
+FROM sys.query_store_query qsq
+JOIN sys.query_store_plan qsp
+    ON qsq.query_id = qsp.query_id
+JOIN sys.query_store_runtime_stats rs
+    ON qsp.plan_id = rs.plan_id
+ORDER BY rs.last_execution_time DESC;
+```
+
+### Step 6: Common fixes
+
+```text
+Update statistics
+Rebuild/reorganize indexes
+Fix parameter sniffing
+Add missing index carefully
+Remove implicit conversions
+Rewrite bad query logic
+Force known good Query Store plan
+Check blocking/deadlocks
+Check waits and resource pressure
+```
+
+---
+
+## 27. What to look for in execution plans
+
+I check:
+
+```text
+Estimated rows vs actual rows
+Index seek vs index scan
+Table scan on large table
+Key lookups
+RID lookups
+Hash Match joins
+Nested Loops with huge row counts
+Sort operators
+Spools
+Warnings
+Missing index suggestions
+Implicit conversions
+Memory grant warnings
+TempDB spills
+Parallelism operators
+```
+
+### Index Seek
+
+Usually good, especially for selective predicates.
+
+### Index Scan
+
+Not always bad. It may be acceptable when reading a large percentage of the table.
+
+### Table Scan
+
+Can be bad on large tables if caused by missing indexes or non-SARGable predicates.
+
+### Key Lookup
+
+Fine for small row counts. Bad when repeated thousands/millions of times.
+
+Possible fix:
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Orders_CustomerID_OrderDate
+ON dbo.Orders(CustomerID, OrderDate)
+INCLUDE (OrderAmount, Status);
+```
+
+### Implicit conversion example
+
+Bad:
+
+```sql
+WHERE VarcharColumn = 123
+```
+
+Better:
+
+```sql
+WHERE VarcharColumn = '123'
+```
+
+### Non-SARGable predicate
+
+Bad:
+
+```sql
+WHERE YEAR(OrderDate) = 2026;
+```
+
+Better:
+
+```sql
+WHERE OrderDate >= '20260101'
+  AND OrderDate <  '20270101';
+```
+
+---
+
+## 28. Clustered index vs nonclustered index based on query conditions
+
+### Clustered index
+
+A clustered index defines the physical/logical order of the table. Choose a clustered key that is:
+
+```text
+Unique or nearly unique
+Narrow
+Static
+Ever-increasing if possible
+Frequently used for range queries
+Not frequently updated
+```
+
+Good candidates:
+
+```text
+Identity column
+OrderDate + OrderID for large range-based tables, depending on workload
+```
+
+Example:
+
+```sql
+CREATE CLUSTERED INDEX CX_Orders_OrderID
+ON dbo.Orders(OrderID);
+```
+
+### Nonclustered index
+
+Use nonclustered indexes for frequently used:
+
+```text
+WHERE predicates
+JOIN columns
+ORDER BY columns
+GROUP BY columns
+Foreign key columns
+Selective filters
+```
+
+Example:
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Orders_CustomerID_OrderDate
+ON dbo.Orders(CustomerID, OrderDate)
+INCLUDE (OrderAmount, OrderStatus);
+```
+
+Rule of thumb:
+
+```text
+Clustered index: table’s primary access/order path
+Nonclustered index: additional query access paths
+```
+
+---
+
+## 29. How to check and optimize fragmentation
+
+Check fragmentation:
+
+```sql
+SELECT
+    DB_NAME() AS database_name,
+    OBJECT_NAME(ips.object_id) AS table_name,
+    i.name AS index_name,
+    ips.index_id,
+    ips.avg_fragmentation_in_percent,
+    ips.page_count
+FROM sys.dm_db_index_physical_stats
+(
+    DB_ID(),
+    NULL,
+    NULL,
+    NULL,
+    'LIMITED'
+) AS ips
+JOIN sys.indexes AS i
+    ON ips.object_id = i.object_id
+   AND ips.index_id = i.index_id
+WHERE ips.index_id > 0
+  AND ips.page_count > 1000
+ORDER BY ips.avg_fragmentation_in_percent DESC;
+```
+
+Common maintenance rule:
+
+```text
+< 5% fragmentation: no action
+5% to 30%: reorganize
+> 30%: rebuild
+```
+
+Reorganize:
+
+```sql
+ALTER INDEX IX_Orders_CustomerID_OrderDate
+ON dbo.Orders
+REORGANIZE;
+```
+
+Rebuild:
+
+```sql
+ALTER INDEX IX_Orders_CustomerID_OrderDate
+ON dbo.Orders
+REBUILD WITH
+(
+    ONLINE = ON,
+    SORT_IN_TEMPDB = ON,
+    MAXDOP = 4
+);
+```
+
+Important: fragmentation is not always the root cause. On SSD/NVMe storage, stale statistics, bad plans, missing indexes, and blocking are often more important.
+
+Update statistics:
+
+```sql
+UPDATE STATISTICS dbo.Orders
+WITH FULLSCAN;
+```
+
+---
+
+## 30. Maximum server memory recommendation
+
+SQL Server’s `max server memory` should not usually be left unlimited on production servers.
+
+You reserve memory for:
+
+```text
+Windows OS
+SQL Server Agent
+Backup tools
+Antivirus/EDR
+Monitoring agents
+SSIS/SSRS/SSAS if installed
+Other applications
+```
+
+Common practical rule:
+
+```text
+Small server, 16–32 GB RAM: leave 4–6 GB for OS
+Medium server, 64–128 GB RAM: leave 8–16 GB for OS
+Large server, 256+ GB RAM: leave 16–32+ GB depending on workload
+```
+
+Example for 128 GB RAM:
+
+```text
+Total RAM: 128 GB
+Reserve for OS/tools: 16 GB
+SQL max server memory: 112 GB
+```
+
+Set it:
+
+```sql
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+
+EXEC sp_configure 'max server memory (MB)', 114688; -- 112 GB
+RECONFIGURE;
+```
+
+Check current value:
+
+```sql
+SELECT
+    name,
+    value,
+    value_in_use
+FROM sys.configurations
+WHERE name = 'max server memory (MB)';
+```
+
+---
+
+## 31. What does `MAXDOP = 0` mean?
+
+`MAXDOP` means **Maximum Degree of Parallelism**.
+
+When `MAXDOP = 0`, SQL Server can use all available logical processors for parallel query execution, subject to internal decisions and workload conditions.
+
+Example:
+
+```sql
+EXEC sp_configure 'max degree of parallelism', 0;
+RECONFIGURE;
+```
+
+Impact:
+
+```text
+SQL Server may use many CPU cores for a single parallel query.
+This can make large analytical queries faster.
+But it can hurt OLTP systems by allowing one query to consume excessive CPU.
+```
+
+Example:
+
+```text
+Server has 32 logical CPUs
+MAXDOP = 0
+A single query may use many CPUs in parallel
+```
+
+Common DBA recommendation:
+
+```text
+Do not blindly leave MAXDOP = 0 on busy OLTP systems.
+Configure MAXDOP based on CPU count, NUMA, workload type, and Microsoft guidance.
+```
+
+Typical practical values:
+
+```text
+OLTP workload: MAXDOP 4 or 8 is common
+Data warehouse/reporting: higher MAXDOP may be acceptable
+Small server: MAXDOP 2 or 4
+```
+
+Query-level override:
+
+```sql
+SELECT *
+FROM dbo.Orders
+OPTION (MAXDOP 4);
+```
+
+Also review `cost threshold for parallelism`. Default value `5` is often too low for modern systems.
+
+Example:
+
+```sql
+EXEC sp_configure 'cost threshold for parallelism', 50;
+RECONFIGURE;
+```
+
+---
+
+## Strong closing statement
+
+As a DBA, I would always connect these topics back to:
+
+```text
+Availability
+Recoverability
+Performance
+Security
+Capacity
+Business RPO/RTO
+Operational risk
+```
+
+For backup and recovery especially, the most important point is not just taking backups, but proving that they can be restored successfully.
+
+[1]: https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/backup-compression-sql-server?view=sql-server-ver17&utm_source=chatgpt.com "Backup Compression (SQL Server)"
+[2]: https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/view-or-configure-the-backup-compression-default-server-configuration-option?view=sql-server-ver17&utm_source=chatgpt.com "Server Configuration: backup compression default - SQL ..."
+[3]: https://learn.microsoft.com/en-us/sql/t-sql/statements/backup-transact-sql?view=sql-server-ver17&utm_source=chatgpt.com "BACKUP (Transact-SQL) - SQL Server"
+[4]: https://learn.microsoft.com/en-us/sql/relational-databases/integrated-acceleration/overview?view=sql-server-ver17&utm_source=chatgpt.com "Integrated acceleration & offloading - SQL Server"
+[5]: https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/view-or-change-the-recovery-model-of-a-database-sql-server?view=sql-server-ver17&utm_source=chatgpt.com "Set database recovery model - SQL Server"
+[6]: https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/recovery-models-sql-server?view=sql-server-ver17&utm_source=chatgpt.com "Recovery Models (SQL Server)"
+[7]: https://learn.microsoft.com/en-us/sql/database-engine/deprecated-database-engine-features-in-sql-server-2016?view=sql-server-ver17&utm_source=chatgpt.com "Deprecated Database Engine Features - SQL Server 2016"
+[8]: https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/basic-availability-groups-always-on-availability-groups?view=sql-server-ver17&utm_source=chatgpt.com "Basic Always On availability groups for a single database"
+[9]: https://learn.microsoft.com/en-us/lifecycle/products/sql-server-2016?utm_source=chatgpt.com "SQL Server 2016 - Microsoft Lifecycle"
+[10]: https://www.lansweeper.com/blog/eol/a-comprehensive-guide-to-sql-server-end-of-life/?utm_source=chatgpt.com "SQL Server End of Life: All You Need To Know - Lansweeper"
+[11]: https://learn.microsoft.com/en-us/sql/relational-databases/security/encryption/transparent-data-encryption?view=sql-server-ver17&utm_source=chatgpt.com "Transparent Data Encryption (TDE) - SQL Server"
+[12]: https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/use-the-system-health-session?view=sql-server-ver17&utm_source=chatgpt.com "Use the system_health session - SQL Server"
+[13]: https://learn.microsoft.com/en-us/sql/relational-databases/replication/administration/frequently-asked-questions-for-replication-administrators?view=sql-server-ver17&utm_source=chatgpt.com "Frequently asked questions for replication administrators"
+
+[1]: https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/restore-a-sql-server-database-to-a-point-in-time-full-recovery-model?view=sql-server-ver17&utm_source=chatgpt.com "Restore a SQL Server Database to a Point in Time (Full ..."
+[2]: https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/tail-log-backups-sql-server?view=sql-server-ver17&utm_source=chatgpt.com "Tail-log backups (SQL Server)"
+[3]: https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/configure-backup-on-availability-replicas-sql-server?view=sql-server-ver17&utm_source=chatgpt.com "Configure backups on secondary replicas of an availability ..."
+[4]: https://learn.microsoft.com/en-us/azure/backup/backup-sql-server-on-availability-groups?utm_source=chatgpt.com "Back up SQL Server always on availability groups - Azure ..."
+[5]: https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-a-server-to-listen-on-a-specific-tcp-port?view=sql-server-ver17&utm_source=chatgpt.com "Configure SQL Server to Listen on a Specific TCP Port"
+[6]: https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/sql-server-browser-service-database-engine-and-ssas?view=sql-server-ver17&utm_source=chatgpt.com "SQL Server Browser Service (Database Engine and SSAS)"
