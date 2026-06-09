@@ -1,4 +1,4 @@
-# Azure SQL Database for SQL Server DBAs, Coop Interview Revision Tutorial
+# Azure SQL Database for SQL Server DBAs, XYZ Interview Revision Tutorial
 
 ---
 
@@ -19,20 +19,20 @@ What changes for a DBA moving from on-prem SQL Server:
 | You provision hardware | You choose a service tier (DTU or vCore) |
 | Restore any .bak file | Cannot restore .bak — use .bacpac, DMA, or replication |
 
-For Coop: This means less infrastructure firefighting, but you still own performance tuning, security, migration planning, DR testing, and incident response. The cloud does not remove DBA responsibility — it shifts it.
+For XYZ: This means less infrastructure firefighting, but you still own performance tuning, security, migration planning, DR testing, and incident response. The cloud does not remove DBA responsibility — it shifts it.
 
 ---
 
-## 2. Coop JD Alignment Table
+## 2. XYZ JD Alignment Table
 
-| Coop JD Requirement | Azure SQL Topic | Why Coop Cares | Interview Angle | What I Should Say | What I Must Avoid Saying |
+| XYZ JD Requirement | Azure SQL Topic | Why XYZ Cares | Interview Angle | What I Should Say | What I Must Avoid Saying |
 |---|---|---|---|---|---|
 | Operation of business-critical SQL Server platforms in 24/7 enterprise | Service tiers, HA/DR, monitoring alerts | Stores, inventory, and pricing must stay up. No downtime. | "How do you keep Azure SQL stable in production?" | Pick provisioned (not serverless) for 24/7. Use Business Critical for low-latency workloads. Configure geo-replication for DR. Set up alerts on CPU, DTU, deadlocks. | "Serverless saves money, so I'd use that." or "Microsoft handles everything, so I don't need monitoring." |
 | Performance tuning, capacity optimization, automation | vCore vs DTU, Query Performance Insight, automatic tuning, DMVs | Retail peak hours (Black Friday, Christmas) require fast queries. | "How do you troubleshoot a slow Azure SQL query?" | Use `sys.dm_db_resource_stats` for 15s granularity, Query Store for plan regression, and scale up vCores if resource-bound. Set up alerts at 80% DTU/CPU. | "I'd just add more DTUs." (Throwing resources at problems without diagnosis) |
-| HA/DR solutions supporting high uptime across data centers | Geo-replication, auto-failover groups, backup restore | Coop operates across Denmark, Greenland, Faroe Islands — needs regional failover. | "What DR strategy for Azure SQL in a multi-region retail company?" | Use auto-failover groups with one secondary region. Test failover quarterly. RTO ~1 hour, RPO ~5 seconds. For zero data loss, use manual planned failover. | "Azure handles HA for me, I don't need to do anything." |
-| Infrastructure modernization, Azure platform, cloud initiatives | Choosing Azure SQL DB vs Managed Instance vs VM | Coop wants future-proof, not lift-and-shift. | "When would you choose Managed Instance over Azure SQL DB?" | Managed Instance if the app needs SQL Agent, CLR, cross-db queries, or .bak restore. Azure SQL DB if the app is modern, elastic, can tolerate missing features. | "Azure SQL DB is always the best choice." |
-| Migrations, upgrades, technical improvement projects | DMA, DMS, transactional replication, .bacpac | Coop has legacy SQL Server apps they want to modernize. | "How would you migrate a 2TB retail database to Azure SQL DB?" | Use DMA for assessment first. If no blockers, use transactional replication for near-zero downtime. Test with a dry run. Have a rollback plan. | "I'd just export a .bacpac and import it." (Too slow for 2TB) |
-| Security, compliance, robust operational processes | TDE, Entra ID, Defender for SQL, auditing, firewall | Coop handles customer data across EU — GDPR compliance is mandatory. | "How do you secure Azure SQL for a retail company?" | Use Entra ID (Azure AD) authentication, not SQL auth. Enable TDE (Microsoft-managed keys unless security team demands customer-managed). Use private endpoint for production. Enable auditing to Log Analytics. | "SQL authentication is fine." or "I'll open a public endpoint for convenience." |
+| HA/DR solutions supporting high uptime across data centers | Geo-replication, auto-failover groups, backup restore | XYZ operates across Denmark, Greenland, Faroe Islands — needs regional failover. | "What DR strategy for Azure SQL in a multi-region retail company?" | Use auto-failover groups with one secondary region. Test failover quarterly. RTO ~1 hour, RPO ~5 seconds. For zero data loss, use manual planned failover. | "Azure handles HA for me, I don't need to do anything." |
+| Infrastructure modernization, Azure platform, cloud initiatives | Choosing Azure SQL DB vs Managed Instance vs VM | XYZ wants future-proof, not lift-and-shift. | "When would you choose Managed Instance over Azure SQL DB?" | Managed Instance if the app needs SQL Agent, CLR, cross-db queries, or .bak restore. Azure SQL DB if the app is modern, elastic, can tolerate missing features. | "Azure SQL DB is always the best choice." |
+| Migrations, upgrades, technical improvement projects | DMA, DMS, transactional replication, .bacpac | XYZ has legacy SQL Server apps they want to modernize. | "How would you migrate a 2TB retail database to Azure SQL DB?" | Use DMA for assessment first. If no blockers, use transactional replication for near-zero downtime. Test with a dry run. Have a rollback plan. | "I'd just export a .bacpac and import it." (Too slow for 2TB) |
+| Security, compliance, robust operational processes | TDE, Entra ID, Defender for SQL, auditing, firewall | XYZ handles customer data across EU — GDPR compliance is mandatory. | "How do you secure Azure SQL for a retail company?" | Use Entra ID (Azure AD) authentication, not SQL auth. Enable TDE (Microsoft-managed keys unless security team demands customer-managed). Use private endpoint for production. Enable auditing to Log Analytics. | "SQL authentication is fine." or "I'll open a public endpoint for convenience." |
 | Troubleshooting, incident management, technical sparring | DMVs, Query Store, metrics alerts, `sys.dm_exec_requests` | A slow checkout or inventory sync is a business emergency. | "Walk me through investigating a sudden spike in Azure SQL DTU usage." | Check `sys.dm_db_resource_stats` for recent 15s CPU/IO spikes. Check Query Store for plan changes. Identify the top query by resource consumption. If it's a bad plan, force the older plan. If it's resource pressure, scale up temporarily. | "I'd restart the database." (Restart doesn't fix bad queries) |
 
 ---
@@ -45,7 +45,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No RDP to the server. No file system access. No `xp_cmdshell`. No SQL Agent.
 
-**Why it matters for Coop:** You cannot "just log in and fix it" like on-prem. Everything is done through T-SQL, portal, or PowerShell.
+**Why it matters for XYZ:** You cannot "just log in and fix it" like on-prem. Everything is done through T-SQL, portal, or PowerShell.
 
 **Production risk:** Assuming you have sysadmin access when you don't. You get server-level roles like `##MS_ServerStateReader##`, not sysadmin.
 
@@ -59,7 +59,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No more patching weekends. No more SAN provisioning. But you still need to test DR, tune queries, and manage users.
 
-**Why it matters for Coop:** Less infrastructure work means more time for performance tuning and automation projects.
+**Why it matters for XYZ:** Less infrastructure work means more time for performance tuning and automation projects.
 
 **Production risk:** Assuming Microsoft handles performance. They don't. A badly written query will still kill your database.
 
@@ -79,7 +79,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** If your app uses SQL Agent, CLR, cross-database queries, Service Broker, or Database Mail, Azure SQL DB will not work. You need Managed Instance.
 
-**Why it matters for Coop:** Many retail apps may have legacy dependencies. You must assess before choosing.
+**Why it matters for XYZ:** Many retail apps may have legacy dependencies. You must assess before choosing.
 
 **Production risk:** Choosing Azure SQL DB for an app that needs SQL Agent. You will hit blockers during migration.
 
@@ -96,7 +96,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** With vCore, you can use Azure Hybrid Benefit to reuse existing SQL Server licenses.
 
-**Why it matters for Coop:** Coop likely has SQL Server licenses. Azure Hybrid Benefit can save significant costs.
+**Why it matters for XYZ:** XYZ likely has SQL Server licenses. Azure Hybrid Benefit can save significant costs.
 
 **Production risk:** Using DTU for a complex workload where you need predictable resource allocation.
 
@@ -113,11 +113,11 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** Serverless is new — no on-prem equivalent.
 
-**Why it matters for Coop:** Coop is 24/7 retail. Serverless is **wrong** for any business-critical system. Cold start delays during peak hours are unacceptable.
+**Why it matters for XYZ:** XYZ is 24/7 retail. Serverless is **wrong** for any business-critical system. Cold start delays during peak hours are unacceptable.
 
 **Production risk:** Using serverless for a production retail database. A customer checkout that takes an extra minute because the database was paused? Unacceptable.
 
-**Interview answer:** "Serverless is for dev/test or intermittent workloads with low usage. For any 24/7 production system at Coop, I use provisioned compute — resources are always available, no cold start, and predictable performance."
+**Interview answer:** "Serverless is for dev/test or intermittent workloads with low usage. For any 24/7 production system at XYZ, I use provisioned compute — resources are always available, no cold start, and predictable performance."
 
 **Beginner mistake:** Enabling serverless on a production database to save money without understanding cold start latency.
 
@@ -134,7 +134,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No need to build Always On AGs yourself — Business Critical includes it.
 
-**Why it matters for Coop:** A retail inventory system with sub-second query requirements needs Business Critical. A reporting warehouse with 50TB of data needs Hyperscale.
+**Why it matters for XYZ:** A retail inventory system with sub-second query requirements needs Business Critical. A reporting warehouse with 50TB of data needs Hyperscale.
 
 **Production risk:** Putting a latency-sensitive app on General Purpose. Remote SSD has higher latency than local SSD.
 
@@ -153,7 +153,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No upfront hardware costs. Pay-as-you-go. You can scale up/down anytime.
 
-**Why it matters for Coop:** Capacity planning is now about choosing the right tier, not buying hardware. Overprovisioning wastes money; underprovisioning causes slow performance.
+**Why it matters for XYZ:** Capacity planning is now about choosing the right tier, not buying hardware. Overprovisioning wastes money; underprovisioning causes slow performance.
 
 **Production risk:** Not understanding backup storage costs. If you have 500GB database and keep 35 days of backups, your backup storage can exceed the 100% free limit significantly.
 
@@ -167,9 +167,9 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No instance-level configuration (max memory, tempdb settings). You just pick region, auth method, and tier.
 
-**Why it matters for Coop:** Multiple retail databases (pricing, inventory, membership) can share one logical server for simpler management.
+**Why it matters for XYZ:** Multiple retail databases (pricing, inventory, membership) can share one logical server for simpler management.
 
-**Production risk:** Choosing the wrong region. Data sovereignty (GDPR) requires data to stay in EU for Coop.
+**Production risk:** Choosing the wrong region. Data sovereignty (GDPR) requires data to stay in EU for XYZ.
 
 **Interview answer:** "I create a logical server per environment (dev, test, prod) in the appropriate region. Each database gets its own service tier based on workload requirements. I use infrastructure-as-code (ARM templates or Terraform) to ensure repeatability."
 
@@ -181,7 +181,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** Resource groups let you manage related Azure resources together (e.g., all retail app resources in one group).
 
-**Why it matters for Coop:** Proper tagging and resource groups make it easier to track costs per business unit or application.
+**Why it matters for XYZ:** Proper tagging and resource groups make it easier to track costs per business unit or application.
 
 **Production risk:** Wrong collation means rebuilding the database. Get this right the first time.
 
@@ -199,7 +199,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No more VPN into a physical data center. Network is configured in Azure.
 
-**Why it matters for Coop:** For production retail systems handling customer data, private endpoint is the security standard. Public endpoint is for dev/test only.
+**Why it matters for XYZ:** For production retail systems handling customer data, private endpoint is the security standard. Public endpoint is for dev/test only.
 
 **Production risk:** Leaving a production database on a public endpoint with "Allow Azure services" enabled. This allows any Azure service to attempt connections.
 
@@ -216,7 +216,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** You need both layers of firewall management.
 
-**Why it matters for Coop:** Application firewall rules travel with the database during geo-failover. Server rules do not. This matters for retail applications that use geo-replication.
+**Why it matters for XYZ:** Application firewall rules travel with the database during geo-failover. Server rules do not. This matters for retail applications that use geo-replication.
 
 **Production risk:** Putting application firewall rules at server level. During failover, those rules don't exist on the secondary server.
 
@@ -230,7 +230,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No more managing SQL logins separately. Use your corporate Azure AD.
 
-**Why it matters for Coop:** Centralized identity management. One place for password policies, MFA, and access reviews. Critical for GDPR compliance.
+**Why it matters for XYZ:** Centralized identity management. One place for password policies, MFA, and access reviews. Critical for GDPR compliance.
 
 **Production risk:** Using SQL authentication with shared credentials. No audit trail of who actually connected.
 
@@ -250,7 +250,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** TDE is automatic. No need to manage certificates. Defender is a cloud-only feature with no on-prem equivalent.
 
-**Why it matters for Coop:** GDPR and retail customer data require defense in depth.
+**Why it matters for XYZ:** GDPR and retail customer data require defense in depth.
 
 **Production risk:** Managing your own TDE keys and losing them. Data becomes permanently unrecoverable.
 
@@ -270,7 +270,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** Your toolbox changes. You cannot rely on OS-level tools.
 
-**Why it matters for Coop:** If a retail app relies on SQL Agent for nightly jobs, Azure SQL DB won't work. You need Managed Instance.
+**Why it matters for XYZ:** If a retail app relies on SQL Agent for nightly jobs, Azure SQL DB won't work. You need Managed Instance.
 
 **Production risk:** Assuming you can run a T-SQL backup command. `BACKUP DATABASE` is not supported.
 
@@ -295,7 +295,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** Azure SQL DB is a subset of SQL Server features. You must design around these limitations.
 
-**Why it matters for Coop:** Many enterprise retail apps use SQL Agent, linked servers, or cross-db queries. These apps cannot go to Azure SQL DB without refactoring.
+**Why it matters for XYZ:** Many enterprise retail apps use SQL Agent, linked servers, or cross-db queries. These apps cannot go to Azure SQL DB without refactoring.
 
 **Production risk:** Not doing a proper feature compatibility assessment before choosing Azure SQL DB.
 
@@ -314,7 +314,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** Backups are automatic. You no longer manage backup jobs, but you must configure retention and test restores.
 
-**Why it matters for Coop:** Compliance may require 7-year retention for financial data. Configure LTR accordingly.
+**Why it matters for XYZ:** Compliance may require 7-year retention for financial data. Configure LTR accordingly.
 
 **Production risk:** Deleting the logical server = all short-term backups are gone. You can still restore from LTR if configured.
 
@@ -331,7 +331,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No configuring Windows Clustering, no quorum management, no AG listener setup. Microsoft handles the complexity.
 
-**Why it matters for Coop:** Retail cannot have 12-hour downtime. Geo-restore is too slow for business-critical systems. Use auto-failover groups.
+**Why it matters for XYZ:** Retail cannot have 12-hour downtime. Geo-restore is too slow for business-critical systems. Use auto-failover groups.
 
 **Production risk:** Relying on geo-restore for DR. RPO of 1 hour and RTO of 12 hours is unacceptable for production retail.
 
@@ -345,7 +345,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No direct `.bak` restore. You need specific migration tools.
 
-**Why it matters for Coop:** Coop likely has dozens of legacy SQL Server databases. A structured migration methodology prevents failures.
+**Why it matters for XYZ:** XYZ likely has dozens of legacy SQL Server databases. A structured migration methodology prevents failures.
 
 **Production risk:** Attempting a migration without assessment. Unsupported features will block you.
 
@@ -366,7 +366,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** Transactional replication from SQL Server to Azure SQL DB is the only way to achieve near-zero downtime migration.
 
-**Why it matters for Coop:** Retail systems cannot have hours of downtime. Transactional replication is the preferred method for production migrations.
+**Why it matters for XYZ:** Retail systems cannot have hours of downtime. Transactional replication is the preferred method for production migrations.
 
 **Production risk:** Using `.bacpac` for a 2TB database. The export/import will take hours or days.
 
@@ -386,7 +386,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** No PerfMon, no custom monitoring scripts (unless you want them). Azure provides built-in tools.
 
-**Why it matters for Coop:** You need to know about resource pressure before stores open. Alert when CPU/DTU > 80%.
+**Why it matters for XYZ:** You need to know about resource pressure before stores open. Alert when CPU/DTU > 80%.
 
 **Production risk:** Not setting up alerts. You find out about a problem when the business calls you.
 
@@ -408,7 +408,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 **What changes:** You cannot run `sys.dm_os_wait_stats` at server level for your workload — it shows Azure fabric waits.
 
-**Why it matters for Coop:** Quick database-scoped troubleshooting without needing server-level access.
+**Why it matters for XYZ:** Quick database-scoped troubleshooting without needing server-level access.
 
 **Production risk:** Looking at `sys.dm_os_wait_stats` in master and thinking those waits are from your workload. They are Azure infrastructure waits.
 
@@ -418,11 +418,11 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ---
 
-## 4. Coop-Style Real-Life Scenarios
+## 4. XYZ-Style Real-Life Scenarios
 
 ### Scenario 1: Choosing Azure SQL DB vs Managed Instance for a Retail App
 
-**Situation:** Coop is migrating a legacy inventory management system that uses SQL Agent for nightly stock reconciliation jobs and a linked server to pull data from the warehouse.
+**Situation:** XYZ is migrating a legacy inventory management system that uses SQL Agent for nightly stock reconciliation jobs and a linked server to pull data from the warehouse.
 
 **Business impact:** If the migration target is wrong, the project will fail or require costly rework.
 
@@ -444,7 +444,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 2: Serverless Database Causing Cold-Start Delay
 
-**Situation:** A Coop store pricing lookup application was migrated to serverless Azure SQL DB to save costs. During opening hours, the first query of the morning takes over a minute.
+**Situation:** A XYZ store pricing lookup application was migrated to serverless Azure SQL DB to save costs. During opening hours, the first query of the morning takes over a minute.
 
 **Business impact:** Store employees cannot look up prices for 60+ seconds. Customers wait at the register.
 
@@ -466,7 +466,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 3: Private Endpoint Required for Secure Production Access
 
-**Situation:** Coop's security team mandates that all production databases must not be accessible from the internet. The existing Azure SQL DB is using a public endpoint.
+**Situation:** XYZ's security team mandates that all production databases must not be accessible from the internet. The existing Azure SQL DB is using a public endpoint.
 
 **Business impact:** Security audit failure. Potential data exposure risk.
 
@@ -488,11 +488,11 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 4: Firewall Misconfiguration Blocking Store Connectivity
 
-**Situation:** Coop stores cannot connect to the central pricing database after a networking change.
+**Situation:** XYZ stores cannot connect to the central pricing database after a networking change.
 
 **Business impact:** Stores cannot update prices. Customers are charged incorrect amounts.
 
-**Technical symptoms:** Connection errors from store systems: "Cannot open server 'coop-pricing' requested by the login. Client IP address 'X.X.X.X' is not allowed to access the server."
+**Technical symptoms:** Connection errors from store systems: "Cannot open server 'XYZ-pricing' requested by the login. Client IP address 'X.X.X.X' is not allowed to access the server."
 
 **Investigation:** Check server firewall rules. The store IP ranges may be missing.
 
@@ -510,7 +510,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 5: Wrong Service Tier Causing Slow Checkout
 
-**Situation:** Coop's checkout application is slow during peak hours (4-6 PM). Transactions that normally take 200ms are taking 2-3 seconds.
+**Situation:** XYZ's checkout application is slow during peak hours (4-6 PM). Transactions that normally take 200ms are taking 2-3 seconds.
 
 **Business impact:** Customers wait longer. Checkout throughput drops.
 
@@ -532,9 +532,9 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 6: Geo-Replication for DR
 
-**Situation:** A regional Azure outage affects the North Europe datacenter where Coop's production database is hosted.
+**Situation:** A regional Azure outage affects the North Europe datacenter where XYZ's production database is hosted.
 
-**Business impact:** Coop stores across Denmark cannot process transactions.
+**Business impact:** XYZ stores across Denmark cannot process transactions.
 
 **Technical symptoms:** All connections to the primary database fail. The application is completely down.
 
@@ -554,7 +554,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 7: Backup Retention Not Matching Compliance
 
-**Situation:** Coop's compliance team requires 7-year retention for financial transaction data. The current Azure SQL DB has default retention of 7 days.
+**Situation:** XYZ's compliance team requires 7-year retention for financial transaction data. The current Azure SQL DB has default retention of 7 days.
 
 **Business impact:** Compliance violation. Potential fines under GDPR.
 
@@ -576,7 +576,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 8: Migration Blocked by Unsupported Features
 
-**Situation:** Coop is migrating a 10-year-old warehouse management database to Azure. The migration fails because the database uses CLR assemblies and Database Mail.
+**Situation:** XYZ is migrating a 10-year-old warehouse management database to Azure. The migration fails because the database uses CLR assemblies and Database Mail.
 
 **Business impact:** Migration project delayed. Extra cost because target must change.
 
@@ -598,7 +598,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 9: Monitoring Alert Detects Resource Pressure Before Business Outage
 
-**Situation:** An Azure alert fires at 7:15 AM: "High CPU on Coop Inventory Database" — CPU > 85% for the last 5 minutes.
+**Situation:** An Azure alert fires at 7:15 AM: "High CPU on XYZ Inventory Database" — CPU > 85% for the last 5 minutes.
 
 **Business impact:** None yet. But if unaddressed, queries will slow as stores open at 8 AM.
 
@@ -620,7 +620,7 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Scenario 10: Automatic Tuning Helps Identify a Bad Query Plan
 
-**Situation:** The Coop membership rewards query suddenly runs 5x slower. The DBA was not aware until membership team complained.
+**Situation:** The XYZ membership rewards query suddenly runs 5x slower. The DBA was not aware until membership team complained.
 
 **Business impact:** Customer reward points calculation delayed. Members see incorrect balances.
 
@@ -751,11 +751,11 @@ For Coop: This means less infrastructure firefighting, but you still own perform
 
 ### Why serverless is risky for 24/7 critical workloads
 
-Serverless auto-pauses after idle. Cold start is ~1 minute. Coop retail systems cannot wait 60 seconds for a database to resume during business hours. **Never use serverless for production 24/7 systems. Use provisioned compute.**
+Serverless auto-pauses after idle. Cold start is ~1 minute. XYZ retail systems cannot wait 60 seconds for a database to resume during business hours. **Never use serverless for production 24/7 systems. Use provisioned compute.**
 
 ### Why Managed Instance may fit better than Azure SQL DB for legacy workloads
 
-Azure SQL DB is missing SQL Agent, CLR, Database Mail, linked servers, cross-database queries, and Service Broker. If Coop's legacy apps use any of these, **you will be blocked**. Managed Instance has near 100% compatibility. Always run DMA before choosing. **Don't discover blockers on migration day.**
+Azure SQL DB is missing SQL Agent, CLR, Database Mail, linked servers, cross-database queries, and Service Broker. If XYZ's legacy apps use any of these, **you will be blocked**. Managed Instance has near 100% compatibility. Always run DMA before choosing. **Don't discover blockers on migration day.**
 
 ### Why private endpoint is preferred for production
 
