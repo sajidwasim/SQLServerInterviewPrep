@@ -55,8 +55,10 @@
       color: var(--text);
       line-height: 1.6;
       font-size: 15px;
+      -webkit-text-size-adjust: 100%;
     }
-    a { color: var(--accent); text-decoration: none; }
+    img, svg { max-width: 100%; height: auto; }
+    a { color: var(--accent); text-decoration: none; touch-action: manipulation; }
     a:hover { color: var(--accent-hover); text-decoration: underline; }
 
     /* Top nav */
@@ -73,7 +75,7 @@
     }
     .top-nav .menu-btn {
       display: none; background: none; border: none; color: var(--text);
-      font-size: 20px; cursor: pointer; padding: 8px;
+      font-size: 20px; cursor: pointer; padding: 8px; touch-action: manipulation;
     }
     .top-nav .logo {
       font-weight: 700; font-size: 15px; color: var(--text);
@@ -367,6 +369,7 @@
         transition: transform 0.3s ease;
         width: 260px;
         -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
       }
       .sidebar.open { transform: translateX(0); }
       .sidebar-overlay {
@@ -374,18 +377,19 @@
         background: rgba(0,0,0,0.5); z-index: 80;
       }
       .sidebar-overlay.open { display: block; }
-      .main-content { margin-left: 0; padding: calc(var(--nav-height) + 16px) 16px 32px; }
+      .main-content { margin-left: 0; padding: calc(var(--nav-height) + 16px) 16px 32px; max-width: 100%; overflow-wrap: break-word; }
       .chapter-title { font-size: 22px; }
       .chapter h2 { font-size: 18px; }
       .chapter h3 { font-size: 16px; }
-      .chapter p, .chapter li { font-size: 14px; line-height: 1.7; }
+      .chapter p, .chapter li { font-size: 14px; line-height: 1.7; overflow-wrap: break-word; }
       .chapter pre code { font-size: 12px; padding: 12px; -webkit-overflow-scrolling: touch; }
-      .chapter blockquote { padding: 10px 12px; }
-      .chapter table { font-size: 12px; display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
-      .chapter table th, .chapter table td { padding: 4px 8px; }
-      .chapter ul, .chapter ol { padding-left: 20px; }
+      .chapter blockquote { padding: 10px 12px; overflow-wrap: break-word; }
+      .chapter table { font-size: 12px; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+      .chapter table th, .chapter table td { padding: 4px 8px; word-break: break-word; overflow-wrap: break-word; }
+      .chapter ul, .chapter ol { padding-left: 20px; overflow-wrap: break-word; }
+      .chapter li { overflow-wrap: break-word; }
       .section-nav { flex-wrap: wrap; gap: 4px; font-size: 12px; }
-      .section-nav .nav-prev, .section-nav .nav-next { flex: 1; min-width: 0; }
+      .section-nav .nav-prev, .section-nav .nav-next { flex: 1; min-width: 0; overflow-wrap: break-word; }
       .section-nav .nav-prev { text-align: left; }
       .section-nav .nav-next { text-align: right; }
       .section-nav .section-counter { flex: 0 0 auto; }
@@ -395,8 +399,8 @@
       .chapter pre .copy-btn { opacity: 1; padding: 8px 12px; }
       .search-bar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; font-size: 12px; }
       .search-bar .match-info { min-width: auto; }
-      .top-nav .theme-toggle { font-size: 13px; padding: 6px 8px; }
-      .chapter .tip, .chapter .warning, .chapter .info { padding: 10px 12px; font-size: 13px; }
+      .top-nav .theme-toggle { font-size: 13px; padding: 6px 8px; touch-action: manipulation; }
+      .chapter .tip, .chapter .warning, .chapter .info { padding: 10px 12px; font-size: 13px; overflow-wrap: break-word; }
     }
 
     @media (max-width: 480px) {
