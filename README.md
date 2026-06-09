@@ -43,7 +43,13 @@ Comprehensive interactive study guide for **Senior Infrastructure Operations Eng
 
 ## Getting Started
 
-### Quick Start
+### Browse Online (recommended)
+
+Open the hosted site on any device:
+
+**https://sajidwasim.github.io/SQLServerInterviewPrep/**
+
+### Run Locally
 
 ```bash
 # Open the study guide directly in your browser
